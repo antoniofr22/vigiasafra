@@ -34,48 +34,118 @@ erDiagram
 
     PLANS {
         int id PK
-        string name
-        json limits "Limites do plano (users, disk, etc)"
+        varchar name "Nome do plano"
+        varchar description "Descrição do plano"
+        varchar slug UK "Identificador único"
+        decimal price "Preço (10,2)"
+        longtext limits "JSON com limites do plano"
+        tinyint is_active "1=ativo, 0=inativo"
+        timestamp created_at
     }
 
     SUBSCRIPTIONS {
         int id PK
         int tenant_id FK
         int plan_id FK
-        string status "active, trialing, past_due, canceled"
+        varchar external_id "ID do gateway de pagamento"
+        enum status "active, past_due, canceled, trialing"
+        timestamp starts_at
         timestamp current_period_start
         timestamp current_period_end
+        timestamp canceled_at
+        varchar cancel_reason "Motivo do cancelamento"
+        varchar payment_method "Método de pagamento"
+        timestamp created_at
+        timestamp updated_at
     }
 
     INVOICES {
         int id PK
         int tenant_id FK
         int subscription_id FK
-        decimal amount
-        string status "paid, open, void"
+        decimal amount "Valor (10,2)"
+        enum status "paid, open, void, uncollectible"
         timestamp paid_at
         date due_date
+        varchar invoice_pdf_url "URL do PDF da fatura"
+        varchar external_id "ID do gateway"
+        timestamp created_at
     }
 ```
 
 ### Detalhes das Tabelas
 
+#### `plans`
+Definição dos planos disponíveis para assinatura.
+
+| Campo | Tipo | Nullable | Key | Default | Extra |
+|-------|------|----------|-----|---------|-------|
+| id | int(11) | NO | PRI | NULL | auto_increment |
+| name | varchar(50) | NO | | NULL | |
+| description | varchar(255) | NO | | NULL | |
+| slug | varchar(50) | NO | UNI | NULL | |
+| price | decimal(10,2) | NO | | NULL | |
+| limits | longtext | NO | | NULL | |
+| is_active | tinyint(1) | YES | | 1 | |
+| created_at | timestamp | NO | | current_timestamp() | |
+
+- **slug**: Identificador único legível (ex: `basico`, `pro`, `enterprise`).
+- **limits**: JSON com limites operacionais (ex: `{"users": 5, "disk_mb": 500}`).
+- **is_active**: Permite desativar planos descontinuados sem removê-los.
+
 #### `subscriptions`
 Tabela central que define se o cliente pode acessar o sistema.
+
+| Campo | Tipo | Nullable | Key | Default | Extra |
+|-------|------|----------|-----|---------|-------|
+| id | int(11) | NO | PRI | NULL | auto_increment |
+| tenant_id | int(10) unsigned | NO | | NULL | |
+| plan_id | int(11) | NO | MUL | NULL | |
+| external_id | varchar(255) | YES | | NULL | |
+| status | enum('active','past_due','canceled','trialing') | YES | | active | |
+| starts_at | timestamp | YES | | NULL | |
+| current_period_start | timestamp | YES | | NULL | |
+| current_period_end | timestamp | YES | | NULL | |
+| canceled_at | timestamp | YES | | NULL | |
+| cancel_reason | varchar(150) | NO | | NULL | |
+| payment_method | varchar(50) | YES | | NULL | |
+| created_at | timestamp | NO | | current_timestamp() | |
+| updated_at | timestamp | NO | | current_timestamp() | on update current_timestamp() |
+
 - **status**:
     - `trialing`: Período de testes (default ao cadastrar).
     - `active`: Assinatura paga e válida.
     - `past_due`: Pagamento falhou ou venceu (bloqueia ou avisa).
     - `canceled`: Cancelada manualmente.
+- **external_id**: ID da assinatura no gateway de pagamento (Stripe, PagSeguro, etc).
 - **current_period_end**: Data limite do acesso. O `SubscriptionHelper` verifica esta data.
+- **canceled_at / cancel_reason**: Registra quando e por que foi cancelada.
+- **payment_method**: Método utilizado (ex: `credit_card`, `boleto`, `pix`).
 
 #### `invoices`
 Histórico de cobranças.
+
+| Campo | Tipo | Nullable | Key | Default | Extra |
+|-------|------|----------|-----|---------|-------|
+| id | int(11) | NO | PRI | NULL | auto_increment |
+| tenant_id | int(11) | NO | | NULL | |
+| subscription_id | int(11) | NO | MUL | NULL | |
+| amount | decimal(10,2) | NO | | NULL | |
+| status | enum('paid','open','void','uncollectible') | YES | | open | |
+| paid_at | timestamp | YES | | NULL | |
+| due_date | date | YES | | NULL | |
+| invoice_pdf_url | varchar(255) | YES | | NULL | |
+| external_id | varchar(255) | YES | | NULL | |
+| created_at | timestamp | NO | | current_timestamp() | |
+
 - Uma assinatura gera N faturas ao longo do tempo (renovação mensal/anual).
 - **status**:
     - `open`: Aguardando pagamento.
     - `paid`: Paga (deve atualizar a `subscriptions` estendendo o prazo).
     - `void`: Cancelada/Anulada.
+    - `uncollectible`: Cobrança impossível (cliente inadimplente).
+- **invoice_pdf_url**: Link para download do PDF da fatura.
+- **external_id**: ID da fatura no gateway de pagamento.
 
 ---
 
