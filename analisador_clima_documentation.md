@@ -12,49 +12,49 @@ O sistema climático é composto por três controllers principais que trabalham 
 
 ```mermaid
 graph TB
-    subgraph "Consumidores"
+    subgraph Consumidores
         VM[VigiaMindController]
         DB[DashboardController]
-        FE[Frontend - AJAX]
+        FE[Frontend AJAX]
     end
 
-    subgraph "Clima Controllers"
+    subgraph ClimaControllers[Clima Controllers]
         CC[ConsultarClima]
         AA[AnalisadorAgricola]
         CH[ConsultarClimaHistorico]
     end
 
-    subgraph "APIs Externas"
+    subgraph APIsExternas[APIs Externas]
         OM[Open-Meteo API]
         AR[Archive API]
     end
 
-    subgraph "Cache Layer"
+    subgraph CacheLayer[Cache Layer]
         SQ[(SQLite Cache)]
         LK[File Locking]
     end
 
-    subgraph "Sessão / Config"
+    subgraph SessaoConfig[Sessao e Config]
         TS[Tenant Settings]
         TL[Tenant Limits]
     end
 
-    VM -->|consultarInternamente()| CC
-    DB -->|consultarInternamente()| CC
-    FE -->|POST /api/clima| CC
-    FE -->|GET /api/climahistorico| CH
+    VM -->|consultarInternamente| CC
+    DB -->|consultarInternamente| CC
+    FE -->|POST api clima| CC
+    FE -->|GET api climahistorico| CH
 
-    CC -->|Busca previsão| OM
+    CC -->|Busca previsao| OM
     CC -->|Instancia| AA
-    CH -->|Busca histórico| AR
+    CH -->|Busca historico| AR
 
-    CC <-->|Read/Write| SQ
-    CH <-->|Read/Write| SQ
+    CC <-->|Read Write| SQ
+    CH <-->|Read Write| SQ
     CC -->|LOCK_EX| LK
 
-    CC -->|Lê config de análise| TS
+    CC -->|Le config de analise| TS
     CC -->|Aplica limites| TL
-    AA -->|Parâmetros por cultura| TS
+    AA -->|Parametros por cultura| TS
 ```
 
 ---
